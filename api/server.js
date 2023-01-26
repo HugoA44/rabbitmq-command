@@ -1,4 +1,3 @@
-const amqp = require("amqplib/callback_api");
 const express = require("express");
 const app = express();
 
@@ -9,8 +8,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const command = require("./models/command");
 command.createTable();
 
-const worker = require("../worker");
-worker();
+const RabbitMQService = require("../helpers/RabbitMQService");
+const Worker = require("../worker");
+const rabbitMQService = new RabbitMQService();
+const worker = new Worker(rabbitMQService);
+worker.start();
 
 app.get("/api", (req, res) => {
   res.send("Hello World!");
@@ -37,15 +39,7 @@ app.get("/api/commands/:id", async (req, res) => {
 app.post("/api/commands", async (req, res) => {
   try {
     const commandId = await command.createCommand(req.body);
-    amqp.connect("amqp://localhost:5672", (err, conn) => {
-      conn.createChannel((err, ch) => {
-        const q = "commandQueue";
-
-        ch.assertQueue(q, { durable: true });
-        ch.sendToQueue(q, Buffer.from(JSON.stringify({ commandId })));
-      });
-    });
-
+    rabbitMQService.publish("commandQueue", { commandId });
     res.json({ commandId });
   } catch (err) {
     return res.status(500).send(err);

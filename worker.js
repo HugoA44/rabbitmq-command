@@ -1,24 +1,27 @@
-const amqp = require("amqplib/callback_api");
 const commandModel = require("./api/models/command");
+const RabbitMQService = require("./helpers/RabbitMQService");
 
-const worker = () =>
-  amqp.connect("amqp://localhost", (err, conn) => {
-    conn.createChannel((err, ch) => {
-      const q = "commandQueue";
+class Worker {
+  constructor(rabbitMQService) {
+    this.rabbitMQService = rabbitMQService;
+  }
 
-      ch.assertQueue(q, { durable: true });
-      ch.consume(q, async (msg) => {
-        const command = JSON.parse(msg.content.toString());
+  async start() {
+    try {
+      await this.rabbitMQService.connect();
+      this.rabbitMQService.consume("commandQueue", async (msg) => {
+        const command = msg;
         command.status = "ok";
         try {
           await commandModel.updateCommand(command);
-          ch.ack(msg);
         } catch (err) {
           console.log(err);
-          ch.nack(msg);
         }
       });
-    });
-  });
+    } catch (err) {
+      console.log(err);
+    }
+  }
+}
 
-module.exports = worker;
+module.exports = Worker;
