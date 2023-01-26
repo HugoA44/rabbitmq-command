@@ -1,5 +1,4 @@
 const commandModel = require("./api/models/command");
-const RabbitMQService = require("./helpers/RabbitMQService");
 
 class Worker {
   constructor(rabbitMQService) {
